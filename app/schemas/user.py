@@ -18,3 +18,8 @@ class UserResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+# Login
+class UserLogin(BaseModel):
+    username: str
+    password: str

@@ -6,8 +6,13 @@ class Settings(BaseSettings):
     debug: bool
     database_url: str
 
+    jwt_secret: str
+    jwt_algorithm: str
+    access_token_expire_minutes: int
+
     class Config:
         env_file = ".env"
         case_sensitive = False
+
 
 settings = Settings()
