@@ -1,16 +1,18 @@
 from fastapi import Depends, HTTPException
-from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from fastapi import HTTPException, Depends
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.database import get_db
+from app.models.user import User
+from app.core.security import oauth2_scheme
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 
-
-def get_current_user(token: str = Depends(oauth2_scheme)):
-    # print("TOKEN RECEIVED:", token)  # DEBUG
-
+def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db)
+):
     try:
         payload = jwt.decode(
             token,
@@ -18,18 +20,20 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
             algorithms=[settings.jwt_algorithm]
         )
 
-        # print("DECODED PAYLOAD:", payload)  # DEBUG
-
         username: str = payload.get("sub")
-        role: str = payload.get("role")
 
         if username is None:
             raise HTTPException(status_code=401, detail="Invalid token")
 
-        return {"username": username, "role": role}
+        # Fetch user from DB
+        user = db.query(User).filter(User.username == username).first()
 
-    except JWTError as e:
-        print("JWT ERROR:", str(e))  # DEBUG
+        if user is None:
+            raise HTTPException(status_code=401, detail="User not found")
+
+        return user  # ✅ return full SQLAlchemy object
+
+    except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
 

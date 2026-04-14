@@ -5,6 +5,7 @@ class Settings(BaseSettings):
     app_name: str
     debug: bool
     database_url: str
+    upload_dir: str
 
     jwt_secret: str
     jwt_algorithm: str

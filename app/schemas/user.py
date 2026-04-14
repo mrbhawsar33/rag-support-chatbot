@@ -1,7 +1,6 @@
 from pydantic import BaseModel
 from datetime import datetime
 
-
 # For user creation (request)
 class UserCreate(BaseModel):
     username: str
