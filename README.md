@@ -6,6 +6,7 @@ AI-powered customer support chatbot that answers questions by retrieving informa
 https://tree-carol-f18.notion.site/ebd//3395eedc20cd809bbacbcad306fba02f
 
 # Structure:
+```
 rag-support-chatbot/
 │
 ├── app/
@@ -19,3 +20,4 @@ rag-support-chatbot/
 ├── .env
 ├── requirements.txt
 └── README.md
+```

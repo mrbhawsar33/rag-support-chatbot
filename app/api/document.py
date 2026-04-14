@@ -1,4 +1,5 @@
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
+from fastapi import Query
 from sqlalchemy.orm import Session
 import os
 import shutil
@@ -10,6 +11,8 @@ from app.core.config import settings
 from app.core.dependencies import get_current_user
 from app.models.document import Document
 from app.schemas.document import DocumentResponse
+from app.services.embedding import get_embedding
+from app.services.vector_store import get_document_collection
 
 
 router = APIRouter(prefix="/api/documents", tags=["Documents"])
@@ -88,7 +91,6 @@ def process_document(
         with open(doc.file_path, "r", encoding="utf-8") as f:
             text = f.read()
 
-        # store raw text temporarily
         # --- chunking ---
         splitter = RecursiveCharacterTextSplitter(
             chunk_size=500,
@@ -97,10 +99,43 @@ def process_document(
 
         chunks = splitter.split_text(text)
 
-        # store chunks as simple string (MVP)
-        doc.document_structure = "||CHUNK||".join(chunks[:20])  # limit for now
+        # limit for MVP
+        chunks = chunks[:20]
+
+        collection = get_document_collection()
+
+        ids = []
+        documents = []
+        embeddings = []
+        metadatas = []
+
+        for i, chunk in enumerate(chunks):
+            chunk_id = f"{doc.document_id}_{i}"
+
+            embedding = get_embedding(chunk)
+
+            ids.append(chunk_id)
+            documents.append(chunk)
+            embeddings.append(embedding)
+            metadatas.append({
+                "document_id": doc.document_id,
+                "chunk_index": i,
+                "filename": doc.filename
+            })
+
+        # store in Chroma
+        collection.add(
+            ids=ids,
+            documents=documents,
+            embeddings=embeddings,
+            metadatas=metadatas
+        )
+
+        # update DB
         doc.chunk_count = len(chunks)
         doc.status = "processed"
+
+        db.commit()
 
     except Exception as e:
         doc.status = "failed"
@@ -110,3 +145,78 @@ def process_document(
     db.commit()
 
     return {"message": "Document processed"}
+
+@router.get("/search")
+def search_documents(
+    query: str = Query(...),
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    # no RBAC restriction for now (customer can use)
+    # embed query
+    query_embedding = get_embedding(query)
+
+    # get collection
+    collection = get_document_collection()
+
+    # search
+    results = collection.query(
+        query_embeddings=[query_embedding],
+        n_results=5
+    )
+
+    return {
+        "query": query,
+        "results": results
+    }
+
+@router.post("/chat")
+def chat(
+    query: str,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    from app.services.embedding import get_embedding
+    from app.services.vector_store import get_document_collection
+    from app.services.llm import generate_answer
+
+    # embed query
+    query_embedding = get_embedding(query)
+
+    # retrieve
+    collection = get_document_collection()
+
+    results = collection.query(
+        query_embeddings=[query_embedding],
+        n_results=5
+    )
+
+    chunks = results.get("documents", [[]])[0]
+
+    # build context
+    context = "\n\n".join(chunks)
+
+    # prompt
+    prompt = f"""
+You are a helpful support assistant.
+
+Answer ONLY using the context below.
+If answer is not present, say: "I don't know."
+
+CONTEXT:
+{context}
+
+QUESTION:
+{query}
+
+ANSWER:
+"""
+
+    # generate
+    answer = generate_answer(prompt)
+
+    return {
+        "question": query,
+        "answer": answer,
+        "sources": chunks
+    }

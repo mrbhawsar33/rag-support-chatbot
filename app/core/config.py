@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     jwt_algorithm: str
     access_token_expire_minutes: int
 
+    chroma_host: str
+    chroma_port: int
+    chroma_collection_name: str
+
     class Config:
         env_file = ".env"
         case_sensitive = False
