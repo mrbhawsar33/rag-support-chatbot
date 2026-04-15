@@ -5,7 +5,7 @@ import os
 import shutil
 from uuid import uuid4
 # from langchain_text_splitters import RecursiveCharacterTextSplitter
-import threading
+# import threading
 
 
 from app.core.database import get_db
@@ -16,6 +16,8 @@ from app.schemas.document import DocumentResponse
 from app.services.embedding import get_embedding
 from app.services.vector_store import get_document_collection
 from app.services.document_processor import process_document_by_id
+from app.services.llm import generate_answer
+from app.services.rag_service import RAGService
 
 
 router = APIRouter(prefix="/api/documents", tags=["Documents"])
@@ -120,53 +122,23 @@ def search_documents(
         "results": results
     }
 
+
 @router.post("/chat")
 def chat(
     query: str,
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
-    from app.services.embedding import get_embedding
-    from app.services.vector_store import get_document_collection
-    from app.services.llm import generate_answer
-
-    # embed query
-    query_embedding = get_embedding(query)
-
-    # retrieve
-    collection = get_document_collection()
-
-    results = collection.query(
-        query_embeddings=[query_embedding],
-        n_results=5
+    rag_service = RAGService(
+        chroma_client=get_document_collection(),
+        embedding_service=get_embedding,
+        llm_service=generate_answer
     )
 
-    chunks = results.get("documents", [[]])[0]
-
-    # build context
-    context = "\n\n".join(chunks)
-
-    # prompt
-    prompt = f"""
-You are a helpful support assistant.
-
-Answer ONLY using the context below.
-If answer is not present, say: "I don't know."
-
-CONTEXT:
-{context}
-
-QUESTION:
-{query}
-
-ANSWER:
-"""
-
-    # generate
-    answer = generate_answer(prompt)
+    response = rag_service.generate_answer(query)
 
     return {
         "question": query,
-        "answer": answer,
-        "sources": chunks
+        "answer": response["answer"],
+        "sources": response["sources"]
     }
