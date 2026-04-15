@@ -4,7 +4,9 @@ from sqlalchemy.orm import Session
 import os
 import shutil
 from uuid import uuid4
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+# from langchain_text_splitters import RecursiveCharacterTextSplitter
+import threading
+
 
 from app.core.database import get_db
 from app.core.config import settings
@@ -13,6 +15,7 @@ from app.models.document import Document
 from app.schemas.document import DocumentResponse
 from app.services.embedding import get_embedding
 from app.services.vector_store import get_document_collection
+from app.services.document_processor import process_document_by_id
 
 
 router = APIRouter(prefix="/api/documents", tags=["Documents"])
@@ -64,7 +67,22 @@ def upload_document(
     db.commit()
     db.refresh(new_doc)
 
+    # --- background processing ---
+    def background_task(document_id: int):
+        from app.core.database import SessionLocal
+        db_session = SessionLocal()
+        try:
+            process_document_by_id(document_id, db_session)
+        finally:
+            db_session.close()
+
+    # threading.Thread(
+    #     target=background_task,
+    #     args=(new_doc.document_id,)
+    # ).start()
+
     return new_doc
+
 
 @router.post("/{document_id}/process")
 def process_document(
@@ -72,79 +90,11 @@ def process_document(
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
-    # RBAC
     if current_user.user_role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
 
-    # fetch document
-    doc = db.query(Document).filter(Document.document_id == document_id).first()
-
-    if not doc:
-        raise HTTPException(status_code=404, detail="Document not found")
-
-    # update status
-    doc.status = "processing"
-    db.commit()
-
-    # --- basic text extraction (MVP) ---
-    try:
-        with open(doc.file_path, "r", encoding="utf-8") as f:
-            text = f.read()
-
-        # --- chunking ---
-        splitter = RecursiveCharacterTextSplitter(
-            chunk_size=500,
-            chunk_overlap=50
-        )
-
-        chunks = splitter.split_text(text)
-
-        # limit for MVP
-        chunks = chunks[:20]
-
-        collection = get_document_collection()
-
-        ids = []
-        documents = []
-        embeddings = []
-        metadatas = []
-
-        for i, chunk in enumerate(chunks):
-            chunk_id = f"{doc.document_id}_{i}"
-
-            embedding = get_embedding(chunk)
-
-            ids.append(chunk_id)
-            documents.append(chunk)
-            embeddings.append(embedding)
-            metadatas.append({
-                "document_id": doc.document_id,
-                "chunk_index": i,
-                "filename": doc.filename
-            })
-
-        # store in Chroma
-        collection.add(
-            ids=ids,
-            documents=documents,
-            embeddings=embeddings,
-            metadatas=metadatas
-        )
-
-        # update DB
-        doc.chunk_count = len(chunks)
-        doc.status = "processed"
-
-        db.commit()
-
-    except Exception as e:
-        doc.status = "failed"
-        db.commit()
-        raise HTTPException(status_code=500, detail=str(e))
-
-    db.commit()
-
-    return {"message": "Document processed"}
+    result = process_document_by_id(document_id=document_id, db=db)
+    return result
 
 @router.get("/search")
 def search_documents(

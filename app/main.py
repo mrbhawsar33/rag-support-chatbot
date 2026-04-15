@@ -9,13 +9,21 @@ from app.api import auth
 from app.api.document import router as document_router
 from app.core.dependencies import get_current_user
 from app.core.dependencies import require_role
-
+from contextlib import asynccontextmanager
+from app.services.scheduler import start_scheduler
 
 # SQLAlchemy models
 from app.models.user import User
 from app.models.document import Document
 
-app = FastAPI(title=settings.app_name)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # startup
+    start_scheduler()
+    yield
+    # shutdown to be added later if needed
+
+app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
 # Database initialization
 Base.metadata.create_all(bind=engine)
