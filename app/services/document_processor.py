@@ -2,7 +2,8 @@ import os
 import time
 
 from sqlalchemy.orm import Session
-from docling.document_converter import DocumentConverter
+# from docling.document_converter import DocumentConverter
+import pdfplumber
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_text_splitters.markdown import MarkdownHeaderTextSplitter
 
@@ -30,11 +31,23 @@ def process_document_by_id(document_id: int, db: Session):
             with open(doc.file_path, "r", encoding="utf-8") as f:
                 markdown_text = f.read()
 
-        # --- use Docling for supported formats ---
+        elif file_ext == ".pdf":
+            text = ""
+
+            with pdfplumber.open(doc.file_path) as pdf:
+                for page in pdf.pages:
+                    try:
+                        page_text = page.extract_text()
+                        if page_text:
+                            text += page_text + "\n"
+                    except Exception as e:
+                        print(f"Skipping page due to error: {e}")
+                        continue
+
+            markdown_text = text
+
         else:
-            converter = DocumentConverter()
-            result = converter.convert(doc.file_path)
-            markdown_text = result.document.export_to_markdown()
+            raise ValueError("Unsupported file type for now")
 
         # Basic preprocessing
         cleaned_text = markdown_text.strip()
@@ -67,9 +80,16 @@ def process_document_by_id(document_id: int, db: Session):
                 final_chunks.append(chunk)
                 chunk_metadatas.append(item.metadata)
 
-        # MVP guard
-        final_chunks = final_chunks[:20]
-        chunk_metadatas = chunk_metadatas[:20]
+        # initial testing - limit to 20 chunks for now
+        # final_chunks = final_chunks[:20]
+        # chunk_metadatas = chunk_metadatas[:20]
+        
+        MAX_CHUNKS = 200  # safe upper bound
+
+        if len(final_chunks) > MAX_CHUNKS:
+            print(f"Too many chunks ({len(final_chunks)}), truncating to {MAX_CHUNKS}")
+            final_chunks = final_chunks[:MAX_CHUNKS]
+            chunk_metadatas = chunk_metadatas[:MAX_CHUNKS]
 
         # Store in Chroma
         collection = get_document_collection()

@@ -140,5 +140,6 @@ def chat(
     return {
         "question": query,
         "answer": response["answer"],
-        "sources": response["sources"]
+        "sources": response["sources"],
+        "metadata": response["metadata"]
     }

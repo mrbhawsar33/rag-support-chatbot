@@ -32,6 +32,7 @@ def start_scheduler():
         process_pending_documents,
         "interval",
         seconds=30,  # every 30 seconds
-        max_instances=1  # prevent overlapping runs
+        max_instances=1,  # prevent overlapping runs
+        misfire_grace_time=60
     )
     scheduler.start()
