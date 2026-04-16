@@ -11,9 +11,11 @@ cookies = EncryptedCookieManager(
 if not cookies.ready():
     st.stop()
 
-if "token" not in st.session_state or st.session_state.token is None:
-    if "token" in cookies:
-        st.session_state.token = cookies.get("token")
+if not st.session_state.get("token"):
+    token = cookies.get("token")
+
+    if token and token.strip() and not st.session_state.get("_logged_out"):  # add this check
+        st.session_state.token = token
         st.session_state.role = cookies.get("role")
         st.session_state.username = cookies.get("username")
         st.session_state.session_id = st.session_state.username
@@ -59,6 +61,18 @@ def login_user(username: str, password: str):
     except requests.RequestException as e:
         return e
 
+def logout():
+    cookies["token"] = ""
+    cookies["role"] = ""
+    cookies["username"] = ""
+    cookies.save()
+
+    # Don't use st.session_state.clear() — it wipes the cookie manager's internal state
+    for key in ["token", "role", "username", "session_id", "messages"]:
+        st.session_state.pop(key, None)
+
+    st.session_state["_logged_out"] = True
+    st.rerun()
 
 def show_login_page():
     st.title("RAG Support Chatbot")
@@ -110,9 +124,7 @@ def show_admin_panel():
         st.write(f"Logged in as: **{st.session_state.username}** (Admin)")
     with col2:
         if st.button("Logout"):
-            cookies.clear()
-            st.session_state.clear()
-            st.rerun()
+            logout()
 
     st.divider()
 
@@ -227,8 +239,7 @@ def show_customer_chat():
         st.write(f"Logged in as: **{st.session_state.username}** (Customer)")
     with col2:
         if st.button("Logout"):
-            st.session_state.clear()
-            st.rerun()
+            logout()
 
     st.divider()
 
