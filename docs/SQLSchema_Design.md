@@ -6,7 +6,7 @@
 
 ## Entity Relation Diagram
 
-![alt text](..\images\Entityrelationshipdiagram.png)
+![alt text](images\Entityrelationshipdiagram.png)
 
 ---
 
