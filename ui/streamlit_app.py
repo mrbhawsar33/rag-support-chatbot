@@ -1,13 +1,30 @@
 import streamlit as st
 import requests
+# import uuid
+from streamlit_cookies_manager import EncryptedCookieManager
 
-LOGIN_URL = "http://localhost:8000/api/auth/login"
+cookies = EncryptedCookieManager(
+    prefix="rag_app",
+    password="some_secret_key"
+)
 
-UPLOAD_URL = "http://localhost:8000/api/documents/upload"
-DOCUMENTS_URL = "http://localhost:8000/api/documents/list"
+if not cookies.ready():
+    st.stop()
 
-API_URL = "http://localhost:8000/api/documents/chat"
-HISTORY_URL = "http://localhost:8000/api/documents/chat/history"
+if "token" not in st.session_state or st.session_state.token is None:
+    if "token" in cookies:
+        st.session_state.token = cookies.get("token")
+        st.session_state.role = cookies.get("role")
+        st.session_state.username = cookies.get("username")
+        st.session_state.session_id = st.session_state.username
+
+LOGIN_URL = "http://backend:8000/api/auth/login"
+
+UPLOAD_URL = "http://backend:8000/api/documents/upload"
+DOCUMENTS_URL = "http://backend:8000/api/documents/list"
+
+API_URL = "http://backend:8000/api/documents/chat"
+HISTORY_URL = "http://backend:8000/api/documents/chat/history"
 
 st.set_page_config(
     page_title="RAG Support Chatbot",
@@ -27,7 +44,6 @@ if "username" not in st.session_state:
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
-
 
 def login_user(username: str, password: str):
     try:
@@ -74,6 +90,14 @@ def show_login_page():
         st.session_state.role = data.get("role")
         st.session_state.username = username
 
+        # persist
+        cookies["token"] = st.session_state.token
+        cookies["role"] = st.session_state.role
+        cookies["username"] = username
+        cookies.save()
+            
+        st.session_state.session_id = username
+
         st.success(f"Logged in as {st.session_state.role}")
         st.rerun()
 
@@ -86,6 +110,7 @@ def show_admin_panel():
         st.write(f"Logged in as: **{st.session_state.username}** (Admin)")
     with col2:
         if st.button("Logout"):
+            cookies.clear()
             st.session_state.clear()
             st.rerun()
 
@@ -241,9 +266,8 @@ def show_customer_chat():
             st.markdown(prompt)
 
         # API call
-        with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                result = send_chat(prompt)
+        with st.spinner("Thinking..."):
+            result = send_chat(prompt)
 
         if isinstance(result, Exception):
             answer = f"Error: {result}"
@@ -274,6 +298,7 @@ def show_customer_chat():
             "content": final_response
         })
 
+        # render assistant response
         with st.chat_message("assistant"):
             st.markdown(final_response)
 
@@ -288,7 +313,8 @@ def send_chat(question):
 
         response = requests.post(
             API_URL,
-            json={"question": question},
+            json={"question": question,
+                "session_id": st.session_state.session_id},
             headers=headers,
             timeout=120
         )
@@ -307,6 +333,7 @@ def fetch_chat_history():
         response = requests.get(
             HISTORY_URL, 
             headers=headers,
+            params={"session_id": st.session_state.session_id},
             timeout=30
         )
 

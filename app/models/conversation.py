@@ -11,3 +11,4 @@ class Conversation(Base):
     role = Column(String, nullable=False)  # "user" or "assistant"
     content = Column(Text, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    session_id = Column(String, index=True, nullable=True)

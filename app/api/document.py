@@ -164,10 +164,10 @@ def chat(
 
     # store conversation-----------
     # user message
-    db.add(Conversation(role="user", content=request.question))
+    db.add(Conversation(role="user", content=request.question, session_id=request.session_id ))
 
     # assistant response
-    db.add(Conversation(role="assistant", content=response["answer"]))
+    db.add(Conversation(role="assistant", content=response["answer"], session_id=request.session_id ))
 
     db.commit()
 
@@ -179,8 +179,17 @@ def chat(
     }
 
 @router.get("/chat/history")
-def get_history(db: Session = Depends(get_db)):
-    conversations = db.query(Conversation).order_by(Conversation.created_at.asc()).all()
+def get_chat_history(
+    session_id: str,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    conversations = (
+        db.query(Conversation)
+        .filter(Conversation.session_id == session_id)
+        .order_by(Conversation.created_at.asc())
+        .all()
+    )
 
     return [
         {

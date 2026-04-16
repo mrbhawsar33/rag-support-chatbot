@@ -8,16 +8,30 @@ https://tree-carol-f18.notion.site/ebd//3395eedc20cd809bbacbcad306fba02f
 # Structure:
 ```
 rag-support-chatbot/
-│
 ├── app/
-│   ├── main.py
-│   ├── core/
 │   ├── api/
+│   │   ├── auth.py
+│   │   └── document.py
+│   ├── core/
 │   ├── models/
+│   │   ├── conversation.py
+│   │   ├── document.py
+│   │   └── user.py
 │   ├── schemas/
-│   └── services/
-│
+│   │   ├── chat_request.py
+│   │   ├── document.py
+│   │   └── user.py
+│   ├── services/
+│   └── main.py
+├── docs/
+├── ui/
+│   ├── chainlit_app.py
+│   └── streamlit_app.py
+├── uploads/
+├── venv/
 ├── .env
-├── requirements.txt
-└── README.md
+├── .gitignore
+├── docker-compose.yml
+├── README.md
+└── requirements.txt
 ```

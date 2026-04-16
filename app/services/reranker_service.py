@@ -3,7 +3,7 @@ from sentence_transformers import CrossEncoder
 
 class RerankerService:
     def __init__(self):
-        self.model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L6-v2")
+        self.model = None # stop model loading CrossEncoder("cross-encoder/ms-marco-MiniLM-L6-v2")
 
     def rerank(self, query: str, documents: list[str], top_k: int = 3):
         pairs = [[query, doc] for doc in documents]
