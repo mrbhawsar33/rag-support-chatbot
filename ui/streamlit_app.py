@@ -229,10 +229,10 @@ def fetch_documents():
         return e
     
 def show_customer_chat():
-    st.title("Customer Chat")
-    if st.button("Clear Chat"):
-        st.session_state.messages = []
-        st.rerun()
+    # st.title("Customer Chat")
+    # if st.button("Clear Chat"):
+    #     st.session_state.messages = []
+    #     st.rerun()
 
     col1, col2 = st.columns([4, 1])
     with col1:
