@@ -22,6 +22,13 @@ rag-support-chatbot/
 │   │   ├── document.py
 │   │   └── user.py
 │   ├── services/
+│   │   ├── document_processor.py
+│   │   ├── embedding.py
+│   │   ├── llm.py
+│   │   ├── rag_service.py
+│   │   ├── reranker_service.py
+│   │   ├── scheduler.py
+│   │   └── vector_store.py
 │   └── main.py
 ├── docs/
 ├── ui/

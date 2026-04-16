@@ -18,13 +18,13 @@ if "token" not in st.session_state or st.session_state.token is None:
         st.session_state.username = cookies.get("username")
         st.session_state.session_id = st.session_state.username
 
-LOGIN_URL = "http://backend:8000/api/auth/login"
+LOGIN_URL = "http://localhost:8000/api/auth/login"
 
-UPLOAD_URL = "http://backend:8000/api/documents/upload"
-DOCUMENTS_URL = "http://backend:8000/api/documents/list"
+UPLOAD_URL = "http://localhost:8000/api/documents/upload"
+DOCUMENTS_URL = "http://localhost:8000/api/documents/list"
 
-API_URL = "http://backend:8000/api/documents/chat"
-HISTORY_URL = "http://backend:8000/api/documents/chat/history"
+API_URL = "http://localhost:8000/api/documents/chat"
+HISTORY_URL = "http://localhost:8000/api/documents/chat/history"
 
 st.set_page_config(
     page_title="RAG Support Chatbot",
