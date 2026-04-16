@@ -1,9 +1,11 @@
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from fastapi import Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 import os
 import shutil
 from uuid import uuid4
+from starlette.concurrency import iterate_in_threadpool
 # from langchain_text_splitters import RecursiveCharacterTextSplitter
 # import threading
 
@@ -12,7 +14,9 @@ from app.core.database import get_db
 from app.core.config import settings
 from app.core.dependencies import get_current_user
 from app.models.document import Document
+from app.models.conversation import Conversation
 from app.schemas.document import DocumentResponse
+from app.schemas.chat_request import ChatRequest
 from app.services.embedding import get_embedding
 from app.services.vector_store import get_document_collection
 from app.services.document_processor import process_document_by_id
@@ -59,7 +63,7 @@ def upload_document(
 
     # --- DB ---
     new_doc = Document(
-        uploaded_by=current_user.user_id,
+        uploaded_by= current_user.user_id,
         filename=file.filename,
         file_path=file_path,
         status="uploaded"
@@ -123,9 +127,30 @@ def search_documents(
     }
 
 
+# @router.post("/chat_stream")
+# def chat_stream(request: ChatRequest,
+#          db: Session = Depends(get_db)
+#     # , current_user = Depends(get_current_user)
+#     ):
+
+#     rag_service = RAGService(
+#         chroma_client=get_document_collection(),
+#         embedding_service=get_embedding,
+#         llm_service=generate_answer
+#     )
+
+#     def stream_generator():
+#         for token in rag_service.stream_answer(request.question):
+#             yield token
+
+#     return StreamingResponse(
+#         stream_generator(),
+#         media_type="text/plain"
+#     )
+
 @router.post("/chat")
 def chat(
-    query: str,
+    request: ChatRequest,
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
@@ -135,11 +160,43 @@ def chat(
         llm_service=generate_answer
     )
 
-    response = rag_service.generate_answer(query)
+    response = rag_service.generate_answer(request.question)
+
+    # store conversation-----------
+    # user message
+    db.add(Conversation(role="user", content=request.question))
+
+    # assistant response
+    db.add(Conversation(role="assistant", content=response["answer"]))
+
+    db.commit()
 
     return {
-        "question": query,
+        "question": request.question,
         "answer": response["answer"],
         "sources": response["sources"],
         "metadata": response["metadata"]
     }
+
+@router.get("/chat/history")
+def get_history(db: Session = Depends(get_db)):
+    conversations = db.query(Conversation).order_by(Conversation.created_at.asc()).all()
+
+    return [
+        {
+            "role": c.role,
+            "content": c.content
+        }
+        for c in conversations
+    ]
+
+@router.get("/list")
+def list_documents(db: Session = Depends(get_db)):
+    docs = db.query(Document).all()
+    return [
+        {
+            "filename": d.filename,
+            "status": d.status
+        }
+        for d in docs
+    ]

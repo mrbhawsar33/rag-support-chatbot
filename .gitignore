@@ -9,3 +9,6 @@ __pycache__/
 
 # uploaded files
 uploads/*
+
+.chainlit/
+chainlit.md
